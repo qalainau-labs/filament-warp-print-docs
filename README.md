@@ -2,7 +2,7 @@
 
 ![The Warp Print designer: fields on the left, an invoice in pounds on an A4 page in the middle, the item table's settings on the right](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/designer.png)
 
-**Let your admins design invoices, delivery notes, price tags and address labels inside Filament — and print them from any record exactly as previewed. Long item tables continue over pages with carried totals, PDFs come from the same page, and the Excel forms your office already uses are filled in place.**
+**Let your admins design invoices, delivery notes, price tags and address labels inside Filament — and print them from any record exactly as previewed. Long item tables continue over pages with carried totals, PDFs come from the same page, the Excel forms your office already uses are filled in place, and official PDF and paper forms can be filled in on screen — by your staff or, through a link, by customers without an account.**
 
 <a href="https://demo.warpui.com/print"><img src="https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/live-demo.png" alt="Try the live demo: demo.warpui.com/print" width="592"></a>
 
@@ -28,19 +28,26 @@ public static function table(Table $table): Table
 - [Features](#features)
 - [Requirements](#requirements)
 - [Installation](#installation)
+  - [AI coding assistants (Laravel Boost)](#ai-coding-assistants-laravel-boost)
 - [Getting started](#getting-started)
 - [Sources and fields](#sources-and-fields)
+- [Document language](#document-language)
 - [Print buttons](#print-buttons)
 - [The designer](#the-designer)
 - [Starter templates](#starter-templates)
 - [Item tables over several pages](#item-tables-over-several-pages)
+- [Photos over several pages](#photos-over-several-pages)
 - [Text, fields and formats](#text-fields-and-formats)
 - [Calculated fields and conditional styles](#calculated-fields-and-conditional-styles)
 - [Copies and watermarks](#copies-and-watermarks)
 - [Text blocks](#text-blocks)
 - [Postcards, envelopes and stamps](#postcards-envelopes-and-stamps)
+- [Barcodes](#barcodes)
+- [Charts](#charts)
 - [Labels](#labels)
 - [Excel forms](#excel-forms)
+- [Word documents](#word-documents)
+- [PDF and paper forms](#pdf-and-paper-forms)
 - [Printing a list](#printing-a-list)
 - [PDF files on the server](#pdf-files-on-the-server)
 - [Sending by email](#sending-by-email)
@@ -61,12 +68,14 @@ public static function table(Table $table): Table
 
 ## Features
 
-- **A designer in the panel.** Text, fields, the item table, images (logo, company seal), lines, boxes, Code 128 and EAN-13 / JAN barcodes and QR codes, placed in millimetres on the real paper size. Rulers, grid, snapping to other elements with guides, alignment, undo and redo, keyboard nudging.
+- **A designer in the panel.** Text, fields, the item table, images (logo, company seal), lines, boxes, [bar, line and pie charts](#charts), [nine kinds of barcode](#barcodes) (Code 128, GS1-128, EAN-13 / JAN, UPC-A, Code 39, ITF-14, NW-7, DataMatrix, the Japan Post customer barcode) and QR codes, placed in millimetres on the real paper size. Rulers, grid, snapping to other elements with guides, alignment, undo and redo, keyboard nudging.
 - **Drafts and versions.** Every change is saved as a draft right away; printing uses the published version until an admin publishes the draft. Earlier versions can be opened again. Two admins editing the same template are warned instead of overwriting each other.
 - **Item tables over many pages.** The heading row repeats on every page, the total can be carried to the next page (*Carried forward / Brought forward*), each page can have a subtotal, empty ruled rows can fill the form, and the last page can be shorter so the table ends above the totals. Elements can appear on the first page only, on the last page, on every page but the first, and so on, or move up under the last row.
 - **What you see is what prints.** The print window shows the actual pages. Printing uses the browser's own print dialog (which also saves PDFs), so nothing has to be installed on the server.
 - **Server PDFs when you need them** — to attach to an email or to save many at once — through Chrome ([Browsershot](https://github.com/spatie/browsershot)) or [Gotenberg](https://gotenberg.dev), drawing exactly the same page.
 - **Your Excel forms.** Upload the `.xlsx` invoice your office already has and write `{{customer.name}}` in its cells. The item row is repeated for every item — first into the empty ruled rows below it, then by adding rows — and merged cells, formulas such as `SUM()`, images, conditional formats and the print area move along. Formatting is never touched.
+- **Your PDF and paper forms.** Upload a PDF — or photos and scans of a paper form — and place fields on it: boxes on scans are found for you, fillable PDF fields are read in. Staff fill it in on the page with the record's values already written, sign it and submit; what they wrote can be saved back to the record. Values are written on top of the original page, so it stays the official form. [More](#pdf-and-paper-forms)
+- **Forms filled in by people without an account.** *Send to fill in* emails a link; customers, suppliers or applicants fill in and sign in their browser, on a phone too. The link expires and closes once the form is submitted, and the result waits for you to check it.
 - **Labels.** Address labels, price tags and name badges on any sheet (A4 24, A4 21, Letter 30, … or your own sizes). Skip the labels already used on a sheet and print several copies of each.
 - **Print the list itself.** `PrintTableAction` prints a Filament table as it is filtered, searched and sorted, with the heading on every page.
 - **Made for real forms.** Japanese era dates (令和8年10月22日), currencies in their own decimals, tax per rate, vertical text, company seals, "shrink to fit" for long names, and a *Reprint* / 再発行 mark that appears from the second print of the same record.
@@ -86,9 +95,10 @@ public static function table(Table $table): Table
 
 - PHP 8.3+ with the `zip` and `dom` extensions
 - Laravel 12 or 13
-- Filament 5
-- SQLite, MySQL 8, MariaDB 10.11+ or PostgreSQL
+- Filament 5.8.3 or later
+- SQLite, MySQL 8.0+, MariaDB 10.11+ or PostgreSQL 14+
 - For PDF files made on the server (optional): Node and Chrome for Browsershot, or a Gotenberg container
+- For filled PDF forms made on the server (optional): Node.js 18 or later (no Chrome)
 
 ## Installation
 
@@ -111,9 +121,37 @@ php artisan migrate
 php artisan filament:assets
 ```
 
-The migration creates three tables: `warp_print_templates`, `warp_print_template_versions` (published versions) and `warp_print_logs` (who printed which record, when, and how). Your tables are not changed. To edit the migration, publish it with `php artisan vendor:publish --tag=filament-warp-print-migrations`. Publish it before you run `php artisan migrate` for the first time: Warp Print then runs your copy instead of its own. If the tables already exist, change them with a migration of your own instead.
+The migration creates these tables: `warp_print_templates`, `warp_print_template_versions` (published versions), `warp_print_logs` (who printed which record, when, and how), `warp_print_exports` (background jobs), `warp_print_documents` (issued documents, when kept) and `warp_print_entries` (filled PDF and paper forms). Your tables are not changed. To edit the migration, publish it with `php artisan vendor:publish --tag=filament-warp-print-migrations`. Publish it before you run `php artisan migrate` for the first time: Warp Print then runs your copy instead of its own. If the tables already exist, change them with a migration of your own instead.
 
 > Run `php artisan filament:assets` again after every update of the package.
+
+### AI coding assistants (Laravel Boost)
+
+Warp Print ships instructions for AI coding assistants such as Claude Code, Cursor and Codex. If your app uses
+[Laravel Boost](https://laravel.com/docs/boost), the assistant learns how to use Warp Print from them: how to
+register sources and print actions, design invoices and labels, fill Excel and Word forms, save PDFs and send email,
+and handle permissions and document language.
+
+- **Guidelines** (`resources/boost/guidelines/core.md`): a short summary that Boost adds to `CLAUDE.md`,
+  `AGENTS.md` and the other agent files. It also points the assistant to this README in `vendor/`, so it reads the
+  documentation of the version you have installed instead of guessing.
+- **Skill** `warp-print-development` (`resources/boost/skills/`): the steps for sources, print buttons, item tables,
+  labels, Office forms, server PDFs, email, permissions and document language. The assistant loads it when it works
+  on printing.
+
+Boost does not add guidelines of other vendors' packages on its own. When `php artisan boost:install` asks
+"Which third-party AI guidelines/skills would you like to install?", select `qalainau/filament-warp-print`. To do
+it without the question, add the package to the existing `packages` array in `boost.json` and run the command again:
+
+```json
+{
+    "packages": ["qalainau/filament-warp-print"]
+}
+```
+
+```bash
+php artisan boost:install --guidelines --skills -n
+```
 
 ## Getting started
 
@@ -177,7 +215,7 @@ public function panel(Panel $panel): Panel
 ->recordActions([PrintAction::make()])
 ```
 
-**4. Design and publish.** Open *Print templates* → *New*, give it a name, choose *Invoice* as the data and *Document* as the kind, and pick the paper. The designer opens. Click *Items* in the field list to add the item table, add the customer's name and the total, then press **Publish**. The Print button on an invoice now offers this template.
+**4. Design and publish.** Open *Print templates* → *New*, give it a name, choose *Invoice* as the data and *Designed layout* as the kind, and pick the paper. The designer opens. Click *Items* in the field list to add the item table, add the customer's name and the total, then press **Publish**. The Print button on an invoice now offers this template.
 
 ## Sources and fields
 
@@ -239,6 +277,59 @@ public function sampleRecord(): ?Model
 
 Every template also has the **print** fields: *Printed on* (`print.date`), *Printed at* (`print.datetime`), *Printed by* (`print.user`), *Reprint* (`print.reprint`, true from the second print of the record with this template) and *Times printed* (`print.count`).
 
+## Document language
+
+By default a document is made in the language of the person printing it (`app()->getLocale()`). When documents go to customers, that is often wrong: someone using the panel in English still sends a Japanese invoice to a Japanese customer. Choose the document's language separately, per record:
+
+```php
+// In a source: only this kind of document
+public function documentLocale(Model $record): ?string
+{
+    return $record->customer?->locale; // 'ja', 'en', 'de', … or null for the screen language
+}
+```
+
+```php
+// In the panel: every document of every source
+WarpPrintPlugin::make()
+    ->sources([InvoiceSource::class, QuoteSource::class])
+    ->documentLocale(fn (Model $record, PrintSource $source): ?string => $record->customer?->locale)
+```
+
+**Which one wins:** the source's `documentLocale()` first. When it returns `null`, the plugin's `documentLocale()` (a language code or a closure; the closure receives `$record` and `$source`). When that is `null` or not set too, the screen language.
+
+**What uses it:** while Warp Print builds one record's document, it switches the app locale, Carbon's locale and `Number`'s locale to the document language, and puts all three back afterwards — also when something throws. So in that language you get:
+
+- what your `state()` closures return (`__('Total')`, `$date->translatedFormat('F')`, `Number::currency(...)`),
+- numbers, money and dates on the page (`1,234.50` or `1.234,50`, `¥700` or `￥700`, month and weekday names),
+- the email subject and message (also the default message), the mail's own view and the attachment's file name,
+- the issued document kept in the archive,
+- Excel forms and PDF / paper forms.
+
+It is the same in the print window's preview, the designer's preview with a chosen record, PDF downloads, `WarpPrint::pdf()` / `html()` / `xlsx()` / `send()`, and background exports and bulk emails.
+
+**Several records at once:** each record gets its own language. A bulk print for one Japanese and one German customer makes one PDF with a Japanese page and a German page; a bulk email sends each customer their own language.
+
+**The screen stays in the screen language.** The print window, the designer, buttons, notifications ("Your PDF is ready") and the name of a ZIP file follow the person using the panel. A background export remembers that person's language for its notification and makes each document in its own language.
+
+Notes:
+
+- Use a language your app has translations for (`lang/ja/...`); Warp Print's own words (the default email message, "continued" on a form) are included in 10 languages.
+- Month and weekday names, and AM / PM, written by a date format (`{{issued_on|date:MMMM}}`) follow the document language everywhere: on the page, in email text, and in Excel and Word cells. The words and the order in a pattern are yours; to keep both in one language, see *A template's own language* below.
+- The labels of fields in the designer (`->label()`) are not printed, so they stay in the screen language.
+- The words you type into a template stay as they are. Numbers and money follow the document language, so pick patterns that suit it. Keep one template per language (an English *Invoice* and a Japanese 請求書) when the words differ too, and give each one its own language (next section).
+
+### A template's own language
+
+A date pattern such as `MMM D, YYYY` has an English order, so for a Japanese document it used to print `Visited 11月 18, 2026`: English words and order with a Japanese month. A report should be in one language. In the template's settings choose **Document language** (the `locale` column of `warp_print_templates`):
+
+- **Match the screen or the customer** (the default, `null`): month and weekday names (`MMM`, `MMMM`, `ddd`, `dddd`) and AM / PM follow the document language above, as before. Use it for a template whose words you let the customer's language decide, such as `M月D日(ddd)`.
+- **A language** (English, 日本語, Deutsch, Français, Español, Italiano, Português (Brasil), 한국어, 简体中文, 繁體中文): those names are always in that language, whatever the screen or the customer uses. An English template set to English prints `Visited Nov 18, 2026` for every document.
+
+Only the names in dates use it. Numbers and money keep following the document language. It applies to the page, PDFs, email subjects and bodies, and Excel, Word and form templates, and it is exported and imported with the template. A template made from a starter gets the starter's language (an English starter is English, a Japanese one is Japanese).
+
+Date patterns that are only numbers (`YYYY/MM/DD`, `YYYY年M月D日`) print the same in every language.
+
 ## Print buttons
 
 ### One record
@@ -280,7 +371,7 @@ Open **Print templates** in the panel. *New* asks for:
 
 - **Name** and **key** — the key is what `->template('invoice')` refers to.
 - **Data** — one of the registered sources. It decides the fields.
-- **Kind** — *Document* (invoices, delivery notes, quotes), *Labels* (many records on a sheet) or *Excel form*.
+- **Kind** — *Designed layout* (invoices, delivery notes, quotes, designed in the panel), *Labels* (many records on a sheet) or *Excel form*.
 - **Paper** and orientation (documents) or the label sheet (labels). Both can be changed later.
 
 ![The print window: page 1 ends with the total carried forward, page 2 starts with it](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/pages.png)
@@ -314,6 +405,10 @@ Admins rarely want to start from a blank page. **From a starter** on the Print t
 | 納品書 (delivery note, Japanese) | A4. No prices; the slip number as a barcode and a box for the receiver's stamp |
 | 領収書 (receipt, Japanese) | A5 landscape. 但し書き, the amount before tax and the tax, a revenue stamp box, and an original plus a copy marked 控 |
 | Invoice, Quote, Receipt (English) | A4 / A5. Logo, amount due, totals right under the items; terms on the quote continue onto a new page when they are long; a *PAID* watermark on the receipt |
+| 発注書, Purchase order | A4. The supplier, the order total, deliver by and deliver to, items that continue on more pages |
+| 取引明細書, Statement of account | A4. Opening balance, charges, payments and closing balance; transactions by date with the running balance, charges and payments carried over pages |
+| 給与明細書, Payslip | A4. Employee and pay period, days worked and overtime, earnings and deductions as two tables side by side, gross pay, total deductions and net pay |
+| 送り状, Shipping label | 100 × 150 mm (4 × 6 in). Ship to and from, contents, ship date, deliver by, pieces, and the tracking number as a Code 128 barcode |
 | Address labels, Price tags | A4 24 and A4 21 sheets; price with an EAN-13 / JAN barcode |
 | はがき (postcard), 長形 3 号 (Naga 3 envelope) | Postal code in the printed boxes, vertical address with kanji numbers, the name with 様 / 御中, the sender |
 
@@ -338,6 +433,22 @@ class InvoiceSource extends PrintSource
 ```
 
 From code: `WarpPrint::fromStarter('invoice-ja', InvoiceSource::class, name: '請求書', key: 'invoice')` returns the template and the fields that were not found.
+
+The starters and the fields they look for (a field with another name is found through the common names, or through `starterFields()`):
+
+| Key | Fields | Tables and their columns |
+| --- | --- | --- |
+| `invoice-ja`, `invoice-en`, `quote-ja`, `quote-en`, `receipt-ja`, `receipt-en`, `delivery-note-ja` | `number`, `subject`, `issued_on`, `due_on` / `valid_until`, `note`, `subtotal`, `tax`, `total` (Japanese: `base_10`, `tax_10`, `base_8`, `tax_8`), `customer.*`, `company.*` | `items`: `name`, `quantity`, `unit`, `unit_price`, `amount` (delivery note: `product.code`) |
+| `purchase-order-ja`, `purchase-order-en` | As an invoice, with `delivery_on` and `delivery_place`. `customer.*` is the supplier (`supplier.name` and `vendor.name` are found too) | `items`, as above |
+| `statement-ja`, `statement-en` | `number`, `issued_on`, `period_from`, `period_to`, `opening_balance`, `charges`, `payments`, `closing_balance`, `note`, `customer.*`, `company.*` | `transactions`: `date`, `reference`, `name`, `charge`, `payment`, `balance` |
+| `payslip-ja`, `payslip-en` | `period`, `paid_on`, `employee.name`, `employee.code`, `employee.department`, `work_days`, `absent_days`, `paid_leave_days`, `overtime_hours`, `gross`, `deductions_total`, `net`, `note`, `company.name`, `company.logo` | `earnings` and `deductions`: `name`, `amount` |
+| `shipping-label-ja`, `shipping-label-en` | `number`, `tracking_number`, `subject`, `issued_on`, `delivery_on`, `package_count`, `note`, `customer.*`, `company.*` | — |
+| `address-labels`, `postcard-ja`, `envelope-naga3-ja` | `name`, `contact`, `postal_code`, `address`, `address2`, `company.*` | — |
+| `price-tags` | `name`, `code`, `price`, `jan` | — |
+
+- A payslip's two tables stay on one page (ten rows each); a longer list of earnings or deductions needs a taller table in the designer. The amounts are yours: the starter adds nothing up, so `gross`, `deductions_total` and `net` come from your source.
+- A statement prints the balances your source gives it. The table carries the *Charges* and *Payments* columns over pages; the running `balance` of each row is a field of the row.
+- The shipping label is a layout for your own label printer or plain paper. It is not a carrier's official waybill: carriers that require their own form or barcode format need that form (see [PDF and paper forms](#pdf-and-paper-forms)).
 
 ## Item tables over several pages
 
@@ -380,6 +491,80 @@ Field::table('items', [
     Field::money('amount'),
 ])->state(fn (Invoice $invoice) => $invoice->items->sortBy(['sale_number', 'position'])->values()),
 ```
+
+### A subtotal under each group
+
+A statement for a month of deliveries needs the amount of each delivery, not only the total of the page. Once a heading field is chosen, tick **Subtotal under each group** below it: a row with the totals of the group is added under the group's last item.
+
+- It totals the columns marked **Add up** in the column settings — the same columns the page subtotal and the carried total use. With no such column the designer shows a warning and the row has nothing to show.
+- **Subtotal text** is the text of the row, placed in the columns before the first total, with `{{fields}}` of the group's first item: `Subtotal {{sale_number}}`. Left empty, the row shows the amounts only.
+- The row is bold, like the page subtotal and the carried total (`totalStyle` of the table in a layout kept in code changes all three).
+- A subtotal is never sent to the next page alone: the item above it moves with it. A group that continues on the next page gets its subtotal where it ends, for the whole group.
+- Subtotals are not items: row numbers, page subtotals and carried totals leave them out, so a carried total stays the running total of the items.
+- Rounding: amounts are added as numbers and then formatted like the column, so a subtotal of 0.1 + 0.2 prints 0.3.
+
+In a layout kept in code:
+
+```php
+'group' => ['field' => 'sale_number', 'content' => 'Delivery {{sale_number}}', 'subtotal' => ['enabled' => true, 'label' => 'Subtotal {{sale_number}}']],
+```
+
+**Rows of your own.** A table also draws heading and total rows that your source puts among the rows, when one layout of groups is not enough (a second level of subtotals, a row for a discount). A row with `__row` set to `heading` is drawn across the table with the text of `__label`; a row with `__row` set to `total` shows `__label` and the values it has for the columns, as they are. Their text is printed as it is — `{{fields}}` in it are not read — and they are left out of row numbers and totals.
+
+```php
+Field::table('items', [Field::text('name'), Field::text('amount')])->state(fn (Statement $statement) => [
+    ['__row' => 'heading', '__label' => 'October'],
+    ['name' => 'Delivery 1001', 'amount' => '¥12,000'],
+    ['__row' => 'total', '__label' => 'October total', 'amount' => '¥12,000'],
+]),
+```
+
+## Photos over several pages
+
+A service report, an inspection or a damage claim has as many photos as were taken: two on one visit, fourteen on the next. The **Photos** element lays out the photos of a table's rows in a grid, each with a caption, and the ones that do not fit continue on added pages.
+
+Give the source a table with an image column (and a text column for the caption):
+
+```php
+Field::table('photos', [
+    Field::image('image')->disk('public'),   // a path on the disk, a data URI or an allowed URL, as for Field::image()
+    Field::text('caption'),
+])->state(fn (WorkOrder $order) => $order->photos()->orderBy('position')->get()),
+```
+
+In the designer, add **Photos** and choose:
+
+| Setting | What it does |
+| --- | --- |
+| **Photos from** | The table whose rows have the photos (only tables with an image column are offered) |
+| **Photo column** | The image column |
+| **Caption under each photo** | Text with the row's fields: `{{caption}}`, `{{#}}. {{caption}}` (`#` numbers the photos 1, 2, 3 … across all pages). Text between `{{#caption}}` and `{{/caption}}` is shown only when that column is not empty: `{{#}}{{#caption}}. {{caption}}{{/caption}}` prints `3` for a photo without a caption instead of `3.`. Up to two lines; longer text ends with … |
+| **Photos across** | 1 to 6 photos side by side |
+| **Photo height**, **Caption height**, **Space between photos** | In mm. Every photo has the same height, so the grid is the same in the preview, the print window and server PDFs. Caption height 0 prints photos only |
+| **Fit** | *Show all of it* (default, nothing is cut) or *Fill the box (crop)* |
+| **Top / Height on added pages** | Where the grid is on the added pages (as for a [text block](#text-blocks)); empty means from the top margin to the bottom margin |
+
+How the photos are placed:
+
+- The photos fill the element's box from left to right, row by row. The rest go onto **added pages after the item table's pages** (and after a text block's continued pages). With *Show on* → *Last page*, the photos start under the item table where it ends.
+- If not even one row fits in the box on that page, the photos start on the first added page.
+- Rows without a photo — empty, not an image, or an image that could not be read — are left out and the next photo takes their place. A caption without a photo is not printed.
+- With **no photos at all**, the element prints nothing and no page is added. To hide a heading over the photos as well, give the heading **Show only when** → the photo table → **has a value** (a table has a value when it has at least one row; in code: `'visibleIf' => ['field' => 'photos', 'operator' => 'filled']`).
+- **Page numbers** count the added pages: `{{page}} / {{pages}}` prints 2 / 2 on the photo page. When several records are printed together, each record gets its own added pages and its own page numbers.
+- **Show on** with added photo pages: *Every page* and *Every page but the first* elements (a header, the page number) are on the photo pages too. **The last page is the last photo page**: *Last page* elements (a signature box) move there, and *Every page but the last* elements are on the item table's last page as well. Elements set to **Move up under the table** (the totals) stay under the table on the table's last page.
+- Captions are text: values are written as text, never as HTML.
+
+Limits: at most **200 photos** per record and **50 added pages** per photo element. Photos past either limit are not printed (nothing tells you on the page), so keep the photos per report below that or make the photos smaller. One photo element per template continues onto added pages; a second one shows the photos that fit in its box only.
+
+In a layout kept in code (`WarpPrint::syncTemplate()`):
+
+```php
+['type' => 'photos', 'x' => 15, 'y' => 150, 'w' => 180, 'h' => 120, 'pages' => 'last',
+    'field' => 'photos', 'image' => 'image', 'caption' => '{{#}}. {{caption}}',
+    'columns' => 3, 'photoH' => 45, 'captionH' => 9, 'gap' => 4, 'fit' => 'contain', 'nextY' => 20, 'nextH' => 250],
+```
+
+A `nextH` too small for one row of photo and caption is dropped when the layout is saved.
 
 ## Text, fields and formats
 
@@ -469,6 +654,97 @@ With **Continue on new pages when it does not fit**, the text that does not fit 
 
 **Stamps.** The *Stamp* element draws a red seal from a name: a round name seal (認印; a name of up to four kanji or kana is written top to bottom), or a **date stamp** (日付印) with a top line such as a department, the date and the name. When the name is empty nothing is drawn, so a stamp in an approval box appears only once someone has approved — see [Approvals with Warp Flow](#approvals-with-warp-flow). For a company seal (角印), upload its image instead.
 
+## Barcodes
+
+The *Barcode* element draws nine kinds of code. Choose the kind under **Type**; a line below it says what the value must look like. The value is a field of the source or fixed text with `{{fields}}`. Bars are drawn as vectors by the same renderer in the designer, the print window and the server PDF, so they stay sharp at any size.
+
+| Type | Value | What is added for you |
+|---|---|---|
+| **Code 128** | Any letters, digits and symbols of ASCII | Runs of digits are packed two to a symbol |
+| **GS1-128** | Elements with the application identifier in brackets: `(01)04912345678904(10)LOT42` | The FNC1 at the start, and the separator after an element of variable length when another follows |
+| **EAN-13 / JAN** | 12 or 13 digits | The check digit, when 12 digits are given |
+| **UPC-A** | 11 or 12 digits | The check digit, when 11 digits are given |
+| **Code 39** | Capitals, digits, spaces and `- . $ / + %` | Small letters become capitals; the `*` at both ends |
+| **ITF / ITF-14** | Digits | 13 digits get the GS1 check digit (ITF-14); another odd number of digits gets a `0` in front |
+| **NW-7 (Codabar)** | Digits and `- $ : / . +`, with a start and a stop letter `A`–`D` around them | `A` at both ends when there are none |
+| **DataMatrix** (ECC 200) | Text up to 174 codewords: about 170 letters, or 340 digits | The smallest square size from 10 × 10 to 48 × 48 that holds the value |
+| **Japan Post customer barcode** | The 7-digit postal code, a space, and the numbers of the address: `1000013 1-3-2-503` | Letters as control codes, padding to 13 characters, the check digit, start and stop bars |
+
+```php
+// In a source: the values the barcodes read
+Field::text('jan'),                                                              // EAN-13 / JAN
+Field::text('carton')->state(fn (Product $product) => '1'.substr($product->jan, 0, 12)),   // ITF-14: 13 digits, the check digit is added
+Field::text('gs1')->state(fn (Product $product) => '(01)0'.$product->jan.'(10)'.$product->lot),
+```
+
+- **Show the number under the bars** prints what is really in the bars: the check digit that was added, the capitals of Code 39, the start and stop letters of NW-7. (Code 128 and EAN-13 print the value as it was given.)
+- When a value does not fit the type — a wrong check digit, a letter in ITF, text too long for DataMatrix — nothing is printed in that place, and the designer says so under the type while the sample value does not fit. A record whose value is empty prints no barcode either.
+- **Sizes.** The bars stretch to the box you draw, with a quiet zone of 10 modules left and right inside it. Keep the narrowest bar at 0.25 mm or more for laser and inkjet printers: as a guide, give EAN-13 and UPC-A at least 30 mm, and a Code 128 of 10 characters at least 40 mm. DataMatrix stays square inside its box; leave a margin of one dot around it.
+- **Japan Post customer barcode.** Make the box **79.8 × 3.6 mm** (the size for 10-point address text) and keep 2 mm clear around it. The value is the postal code and the *address display number* — the numbers of the address after the town name, joined by hyphens (`1-3-2-503` for 1 丁目 3 番 2 号, room 503). Working that number out from a free-text address is left to your source, as only your app knows how addresses are stored:
+
+  ```php
+  Field::text('postal_barcode')->state(function (Customer $customer): string {
+      preg_match_all('/\d+/', $customer->address.' '.$customer->address2, $numbers);
+
+      return preg_replace('/\D/', '', $customer->postal_code).' '.implode('-', $numbers[0]);
+  }),
+  ```
+
+  Japan Post's discount for barcoded mail has its own conditions (number of items, sorting, a test print checked by the post office); print a sample and have it checked before a large mailing.
+- **What is not covered.** Code 93, PDF417, GS1 DataBar, rectangular DataMatrix and sizes above 48 × 48, check characters for Code 39 and NW-7 (add them in your `state()` when your reader needs one), and non-ASCII text in DataMatrix read back as text by every scanner (bytes are written as UTF-8 without an ECI mark; stay with ASCII for values a scanner must type).
+
+Every type is tested by drawing the picture and reading it back with a decoder (ZXing), in the unit tests and — on screen and in the server PDF — in the browser check `tests/browser/barcodes.cjs` of the development app. The Japan Post barcode, which that decoder cannot read, is checked bar by bar against the published table and check digit.
+
+## Charts
+
+A monthly report reads faster with a chart next to its table. The *Chart* element draws **bars, a line or a pie** from the rows of a table of the source — the same rows a table element prints, so the chart and the table under it always agree. It is drawn as vector shapes by the same renderer in the designer, the print window and the server PDF: sharp at any size, with text that can be selected and searched in the PDF.
+
+```php
+// In a source: a table with a name and one or more numbers for each row
+Field::table('monthly', [
+    Field::text('month'),
+    Field::money('billed', 'JPY'),
+    Field::number('invoices'),
+])->state(fn (Customer $customer) => $customer->invoices
+    ->sortBy('issued_on')
+    ->groupBy(fn (Invoice $invoice) => $invoice->issued_on->format('Y-m'))
+    ->map(fn ($invoices, string $month) => ['month' => $month, 'billed' => $invoices->sum('total'), 'invoices' => $invoices->count()])
+    ->values()),
+```
+
+Click **Chart** in the designer: it starts as a bar chart of the first table. On the right:
+
+| Setting | What it does |
+|---|---|
+| **Bars / Line / Pie** | The kind of chart |
+| **Rows from** | The table whose rows are drawn. One bar, point or slice for each row, in the order of the rows |
+| **Name of each row** | The column printed under the bars and points, and in the legend of a pie |
+| **Values** | The number or money column to draw. *Add another value* puts up to four columns side by side (bars) or as lines, each with its colour; a legend with their names appears from the second one. A pie draws the first value only |
+| **Title** | A line above the chart; it may use `{{fields}}` of the record |
+| **Show the values** | Writes each value above its bar or point, or the share (%) on the slices of a pie. Values that would not fit are left out |
+| **Show the legend** | For a single value in a bar or line chart (with two or more it is always shown) |
+| **Name of the slice for the rest** | Pie only: the name of the slice that adds the smaller rows together when there are more than 12 |
+
+- **Numbers.** Values are written like the column they come from: a `Field::money()` column prints `¥430,130` on the axis, above the bars and in the legend. The axis starts at zero and uses round steps; whole-number data (counts) gets whole-number steps. Bars below zero hang down from the zero line.
+- **Size and text.** The chart fills the box you draw. The text size is the element's font size (7 pt at first); names on the axis that would overlap are thinned out, and long names are cut with `…`.
+- **Limits.** Up to **100 rows** are drawn in a bar or line chart (more are left out, from the end). A pie keeps the 11 largest rows and adds the rest into one slice; rows of zero or less have no slice. A value that is not a number counts as 0.
+- **Nothing to draw.** With no rows, no value column, or only zeros in a pie, nothing is printed in the chart's place (the designer shows an empty box). A chart whose table or columns are no longer in the source is reported under it as *Fields that are not in the data*.
+- A chart is an ordinary element: it can be limited to the first or last page, follow the end of an item table, or appear only when a field matches.
+- Not covered: stacked or horizontal bars, areas, two axes, and charts from separate fields of the record (give the chart a table — a `state()` returning two rows is enough).
+
+In a layout kept in code:
+
+```php
+['type' => 'chart', 'x' => 15, 'y' => 42, 'w' => 180, 'h' => 72,
+    'kind' => 'bar',                    // bar, line or pie
+    'field' => 'monthly',               // the table
+    'labelField' => 'month',
+    'series' => [['field' => 'billed', 'label' => 'Billed', 'color' => '#2563eb']],
+    'title' => 'Billed by month', 'showValues' => true, 'legend' => false,
+    'format' => ['kind' => 'number', 'decimals' => 0],   // optional: how values are written, as for a field
+    'style' => ['size' => 7.5]],
+```
+
 ## Labels
 
 ![Price tags in US dollars with an EAN-13 barcode, three copies of each](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/labels.png)
@@ -477,11 +753,43 @@ A *Labels* template designs **one label**. The sheet is set in the page settings
 
 Print labels with `PrintBulkAction` (or `PrintAction` for one). The print window asks for **Labels already used** — to start on a partly used sheet — and **Copies of each**.
 
+### A label for each item row, as many as the quantity
+
+A delivery note of three item rows — 3 boxes, 1 box, 12 boxes — needs 16 item tags, not one label. Under **How many labels** in the page settings of a label template:
+
+| Setting | Choices | What it does |
+|---|---|---|
+| **One label for** | *Each record* (default) or *Each row of* one of the source's tables | One label for every row of that table, in the order of the rows. A record without rows prints no label |
+| **Labels of each** | *One* (default) or a number field | That many labels of each record or row: `3` gives three, `0` or less gives none, a fraction is rounded up (2.5 → 3), an empty value or text gives one. At most 1,000 from one value |
+
+With *Each row of Items* chosen, the columns of the row appear in the field list as fields of their own (`items.name`, `items.quantity`, …) and can be dragged onto the label, used in text as `{{items.name}}`, or read by a barcode. `{{items.#}}` is the number of the row. The fields of the record itself (`number`, `customer.name`) stay available on every label. Two more fields say which label of a run this is: `{{label.number}} / {{label.count}}` prints `1 / 3`, `2 / 3`, `3 / 3`.
+
+```php
+// The source needs nothing new: the table it already has, with the quantity as a number
+Field::table('items', [
+    Field::text('product.code'),
+    Field::text('name'),
+    Field::number('quantity'),
+]),
+```
+
+In a layout kept in code (`WarpPrint::syncTemplate()`), the two settings are `labels.each` and `labels.copiesField`:
+
+```php
+'labels' => ['columns' => 3, 'rows' => 7, 'width' => 63.5, 'height' => 38.1, /* … */ 'each' => 'items', 'copiesField' => 'items.quantity'],
+```
+
+- **Copies of each** in the print window multiplies the number: quantity 3 and 2 copies give 6 labels, numbered 1 / 6 to 6 / 6.
+- The print window shows how many labels will come out next to the page count. One print is limited to **5,000 labels**; when there would be more, only the first 5,000 are drawn and the window says so — select fewer records and print the rest separately.
+- *Labels of each* works without rows too: a field of the record (`Field::number('boxes')`) prints that many labels of a record.
+- A column of a table can only be placed outside a table in a template that prints one label for each row of that table. Anywhere else the designer reports it under the element as a field that cannot be used, and nothing is printed for it.
+- Only the records the user may print are read (`PrintSource::canPrint()` and the tenant scope), as for every other template: the rows come from those records.
+
 ## Excel forms
 
 ![The fields found in an uploaded Excel invoice, each checked against the data](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/excel.png)
 
-Choose *Excel form* as the kind and upload an `.xlsx` file. In the cells where values go, write fields in double braces, exactly like a text element: `{{customer.name}} 御中`, `No. {{number}}`, `{{issued_on|date:YYYY年M月D日}}`.
+Choose *Excel or Word file* as the kind and upload an `.xlsx` file. In the cells where values go, write fields in double braces, exactly like a text element: `{{customer.name}} 御中`, `No. {{number}}`, `{{issued_on|date:YYYY年M月D日}}`.
 
 - A cell with **only one field** (`{{total}}`) receives the value itself — a number or a date — so the cell's own number format applies (`¥#,##0`, `yyyy/m/d`). A cell with text around the field receives formatted text.
 - **Item rows:** write the item fields (`{{items.name}}`, `{{items.quantity}}`) in one row. That row is used for the first item. The next items go into the **empty rows below it that have the same borders** (the ruled rows of a form), and when those run out, rows are added. Formulas in the row (`=E11*G11`) are copied for each item; merged cells are repeated.
@@ -489,6 +797,180 @@ Choose *Excel form* as the kind and upload an `.xlsx` file. In the cells where v
 - Formulas are recalculated when the file is opened.
 
 The settings page lists every `{{…}}` found in the file and whether the data has that field, and **Download with a sample** fills it with the newest record. Uploading a new file publishes a new version. From the print window, Excel templates download as `.xlsx` (several records: a ZIP). With the Gotenberg driver one record at a time can also be downloaded as PDF.
+
+## Word documents
+
+Contracts, notices and reminders are usually written in Word, by someone who will not learn a designer for them. Choose *Excel or Word file* as the kind and upload the `.docx` file as it is, with fields written in double braces where the values go — the same way as in an Excel form.
+
+```text
+Dear {{customer.contact}},
+
+Our records show that invoice {{number}}, issued on {{issued_on|date:MMMM D, YYYY}},
+has not been paid yet. The amount due is {{total}}.
+
+| #           | Item           | Qty                | Amount           |
+| {{items.#}} | {{items.name}} | {{items.quantity}} | {{items.amount}} |
+|             | Total due      |                    | {{total}}        |
+```
+
+- **Where fields can be written:** anywhere in the text, in tables, in the header and the footer, in footnotes and in text boxes. Styles, fonts, images, page settings and everything else in the file stay as they are.
+- **Formats** follow the field, as in text elements: money as `¥25,630`, dates as `2026/11/12`, and `{{field|format}}` changes it (`{{issued_on|date:MMMM D, YYYY}}`, `{{total|number}}`, `{{customer.name|upper}}`). The document is written in the record's language ([Document language](#document-language)).
+- **The value takes the look of the first brace.** Word often saves `{{customer.name}}` in several pieces (after a spelling check, or when part of it was made bold). The pieces are joined when the file is read, and the value gets the font, size and colour of the `{{` it starts with.
+- **Item rows:** a table row that contains fields of a table of the source (`{{items.name}}`) is repeated for every item, with the row's settings and formatting. `{{items.#}}` is the number of the row; fields of the record (`{{number}}`) may be used in the row as well. With no items, the row stays once, empty. A table inside a repeated row is filled first.
+- **Several lines:** a value with line breaks (a note, an address) becomes lines in the same paragraph.
+- The settings page lists every `{{…}}` found, where it is (text, header, footer) and whether the data has that field; **Download with a sample** fills the file with the newest record. Uploading a new file publishes a new version.
+- From the print window, Word templates download as `.docx` (**Download Word**; several records: a ZIP with one file each). Emails attach the `.docx`, and background exports make *One Word file per record, in a ZIP*.
+- **PDF:** with the Gotenberg driver (LibreOffice) one record at a time can be downloaded, emailed or exported as PDF, as for Excel forms. The Browsershot driver cannot convert Word files.
+
+From code: `WarpPrint::docx('payment-reminder', $invoice)` returns the bytes of the filled `.docx` (several records: a ZIP). `WarpPrint::xlsx()` is for Excel templates and `WarpPrint::docx()` for Word templates; each refuses the other kind.
+
+**What a Word template cannot do** — use a designed layout when you need these:
+
+- Only **table rows** are repeated. A paragraph, a bullet of a list or a whole section is not repeated for each item, and an item field written outside a table row prints nothing.
+- **Images** (`Field::image()`: a logo, a seal, a signature) are not inserted; put the fixed images in the file itself. QR codes and barcodes are not drawn.
+- There are no conditions: a paragraph cannot be shown or hidden by a field, and there are no totals, page subtotals or carried rows (write the total as a field of the source).
+- Fields are read in the document's text. A field inside a Word *field code*, a comment, a tracked deletion, a chart or SmartArt is not replaced; neither is a `{{…}}` that is split across two paragraphs.
+- Numbers go in as formatted text: Word does not calculate with them.
+- `.doc` (the old format), `.docm` (macros) and `.dotx` files are not accepted; save the file as `.docx`. Files are limited to 10 MB.
+
+## PDF and paper forms
+
+![A scanned credit application filled in on screen: the company, contact, email and address from the customer, a ZIP code one digit per box, a ticked box and a signature](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/forms-fill.png)
+
+Some forms are not yours to design: a government form, a bank's application, a customer's own order sheet, a paper form that has been used in the office for years. Warp Print takes the form **as it is** — a PDF, or photos or scans of the paper — and lets admins put fields on it. Then:
+
+- **Fill it in on screen.** Staff press *Fill in form* on a record. The form opens with the record's values already written in; they type on the page itself, sign with a finger or the mouse, and submit. What they wrote can be saved back to the record.
+- **Send it to someone outside.** *Send to fill in* emails a link to a customer, supplier or applicant. They fill in and sign the form in their browser **without an account**. The link works until a date you choose and closes once it is submitted; the filled form waits in *Filled forms* until someone checks it and saves it to the record.
+- **Just print it.** Pick the form in the normal *Print* window and the record's values go straight into it — a W-9 for every vendor, a change-of-address form for a customer.
+
+The PDF's own lines and text are never redrawn: values are written on top of the original page, so the result looks exactly like the official form. If the PDF has its own fillable fields (AcroForm), they are found when it is uploaded and filled directly.
+
+### Making a form
+
+1. **Print templates → New → *PDF or paper form*.** Choose the source as for any template.
+2. **Choose the form.** One PDF, or PNG / JPEG images (one per page; they are turned into a PDF in your browser). If the PDF has fillable fields, the designer offers to add them all.
+3. **Place the fields.** For scans, press **Find boxes on this page**: ruled boxes, check boxes and rows of one-character boxes (postal codes, account numbers) are found and shown as dashed boxes — click one to add it, or *Add all*. Boxes that already contain printed text (the *Company name* label next to the box) are left out. Or add fields from the palette, or drag a field from your source onto the page.
+4. **Give each field a label** (shown to the person filling it in) and, if it comes from the record, choose it under *Fill in from*.
+5. **Preview** with a sample record, then **Publish**.
+
+![The form designer: the scanned credit application with fields on its boxes, the ZIP code field selected and filled in from the customer's postal code](https://raw.githubusercontent.com/qalainau-labs/filament-warp-print-docs/main/art/forms-designer.png)
+
+Each field has a type:
+
+| Type | Use it for |
+|---|---|
+| Text, Several lines | Names, addresses, notes. Long text becomes smaller to fit, or wraps on the paper's own ruled lines (*Line spacing*) |
+| Number, Amount, Date | Formatted like the rest of Warp Print: `1,234.50`, `$1,234.50`, `2026/11/05`, `令和8年11月5日` |
+| One per box | One character per printed box: postal codes, phone and account numbers. Set the number of boxes, the gap and whether to start from the left or the right |
+| Check box | A tick, cross, dot or filled box when it is chosen |
+| Choice | One of several options with the same name: *circle* "Yes" or "No", tick one of four plans |
+| List | Pick one item from a list; the item is written on the form |
+| Signature, Photo | Drawn on a pad (finger, pen or mouse) or uploaded, then fitted into the box |
+| Seal | A round red seal with a name (印鑑) |
+| Calculated | A formula over other fields: `quantity * price`, `sum(items.amount)`, `round(total * 0.1)` |
+| Item rows | A table with a fixed number of rows on the form. Rows that do not fit go onto an extra sheet after the form (*Items (continued)*) |
+| Fixed text | Text that is the same on every copy, or `{{customer.name}}` from the record |
+
+**One value, several places.** Fields with the same *name* share one value. Add a part with **Add another part** to write a date as `令和 [8] 年 [11] 月 [5] 日` in three separate boxes (formats `GGGG`, `E`, `M`, `D`), or to repeat the applicant's name on page 2.
+
+**Checks.** *Must be filled in*, minimum and maximum length, smallest and largest number, and a format: digits only, email, phone number, Japanese postal code, katakana, hiragana… Full-width digits (`１２３`) are accepted and stored as `123`. The same checks run in the browser while typing and again on the server when the form is saved.
+
+### Filling in from the panel
+
+```php
+use Qalainau\FilamentWarpPrint\Actions\FillFormAction;
+use Qalainau\FilamentWarpPrint\Actions\SendFormLinkAction;
+
+->recordActions([
+    FillFormAction::make()->template('credit-application'),
+    SendFormLinkAction::make()->template('credit-application'),
+])
+```
+
+*Fill in form* opens the form for the record (or continues the draft this user already started). Every change is saved as a draft after a moment. The page can be filled **on the form** or **as a list** — on a phone, the list opens first and shows the part of the paper around each field, so people know where they are writing. *Download PDF* makes the filled PDF in the browser at any time. *Submit* checks the required fields; after that the entry can no longer be changed (*Allow changes again* reopens it).
+
+Filled forms are listed under **Filled forms**, with who filled them in and when. Forms that are not linked to a record (an application form) can be started there with **Fill in a new form**.
+
+### Saving the values back to the record
+
+A field can only change the record if your source allows it:
+
+```php
+public function fields(): array
+{
+    return [
+        Field::text('name')->writable(),
+        Field::text('phone')->writable(),
+        // A relation or a computed value: say how to save it
+        Field::text('contact.email')->writable(fn (Customer $record, ?string $value) => $record->contact->update(['email' => $value])),
+        Field::date('created_at'), // filled in, never saved back
+    ];
+}
+```
+
+When **staff** submit a form, the writable fields are saved to the record at once (if the record's policy allows `update`; override `canWriteBack()` to decide yourself). Forms sent by **link** are not saved automatically: open the entry, check it, and press **Save to record**. Calculated fields, signatures, photos and item rows are never saved back. A field marked *Cannot be changed* keeps the record's value whatever the browser sends.
+
+### Links for people without an account
+
+`SendFormLinkAction` asks for the email address, a name, how many days the link works (14 by default) and a message. The first address comes from your source:
+
+```php
+public function formRecipient(Model $record): array
+{
+    return ['name' => $record->contact_name, 'email' => $record->email];
+}
+```
+
+The email contains a button to the form. The page at `/warp-print/forms/{token}` needs no login: the token is long, random and stored only as a hash; the link stops working when it expires or when the form is submitted, and saving is rate limited per link (`forms.link.per_minute`). When they submit, they can leave their name and email, and get the filled PDF to keep. *Send a new link* in *Filled forms* makes a new link and turns the old one off.
+
+Change the email with `->modifyMailUsing(fn (FormLinkMail $mail) => $mail->replyTo('hr@example.com'))`. To react to submissions — create a record from an application form, tell someone — listen for `FormEntrySubmitted`:
+
+```php
+use Qalainau\FilamentWarpPrint\Events\FormEntrySubmitted;
+
+Event::listen(function (FormEntrySubmitted $event) {
+    if ($event->byLink) {
+        Notification::make()->title('A form was submitted')->sendToDatabase($event->entry->template->owner);
+    }
+});
+```
+
+### Filled PDFs on the server
+
+Downloading and printing work in the browser and need nothing on the server. To make filled PDFs **on the server** — to attach them to emails, make many at once in the background, store the submitted PDF, or call `WarpPrint::pdf('w9', $vendor)` from code — Warp Print runs the same JavaScript in **Node.js 18 or later**. Chrome is not needed.
+
+```bash
+php artisan warp-print:fonts         # download Noto Sans JP and Noto Serif JP into storage/app/warp-print/fonts
+php artisan warp-print:check-forms   # find node, list the fonts and fill a test page
+```
+
+If PHP cannot find `node` (PHP-FPM often has a short `PATH`), set the full path: `WARP_PRINT_FORMS_NODE=/usr/bin/node`. Set it to `null` in the config to turn server PDFs off.
+
+**Fonts.** A PDF needs the font inside it. Without an installed font only English letters can be written, and the designer warns about it. `warp-print:fonts` installs Noto Sans JP and Noto Serif JP (SIL Open Font License), which also cover Chinese characters. For Korean, or your own fonts, point `forms.fonts` at TrueType files:
+
+```php
+'fonts' => [
+    'sans' => ['label' => 'Sans-serif', 'google' => 'Noto Sans KR', 'regular' => storage_path('app/warp-print/fonts/NotoSansKR-Regular.ttf'), 'bold' => storage_path('app/warp-print/fonts/NotoSansKR-Bold.ttf')],
+],
+```
+
+Only the characters used are embedded, so filled PDFs stay small.
+
+### From code
+
+```php
+$forms = WarpPrint::forms();
+
+$entry = $forms->start('credit-application', $customer);          // a draft with the record's values
+$errors = $forms->save($entry, ['credit_limit' => '5000'], submit: true, user: auth()->user());
+$link = $forms->invite('w9', $vendor, 'ap@vendor.com', 'Ann', days: 7);  // ['entry' => ..., 'url' => ...]
+$forms->apply($entry);                                             // save the writable fields to the record
+$pdf = $forms->pdf($entry);                                        // needs node
+
+WarpPrint::pdf('change-of-address', $customer);                    // the record's values, no entry
+```
+
+An entry keeps the **version** of the form it was started on. If you replace the PDF or move fields later and publish again, entries that were already started are still printed on the old version.
 
 ## Printing a list
 
@@ -502,6 +984,30 @@ use Qalainau\FilamentWarpPrint\Actions\PrintTableAction;
 ```
 
 The list is printed as the table is now: its filters, search and sort, and its visible columns, with the text the table shows (`money()`, `formatStateUsing()`, enum labels, ✓ for icon columns). The heading repeats on every page, with the page number and when it was printed. With more than six columns it turns sideways (`->landscape(false)` to keep it upright). At most 2,000 rows unless `->limit()` says otherwise.
+
+### Totals and groups
+
+A printed list of invoices is usually read for its total, and often for the total of each customer.
+
+```php
+PrintTableAction::make()
+    ->totals(['total', 'tax'])     // a Total row at the end for these columns
+    ->groupBy('customer.name'),    // a heading for each customer, and a Subtotal under each when there are totals
+
+PrintTableAction::make()->totals()->groupBy(),   // follow the table: its Sum summarizers and the group chosen on screen
+```
+
+| Method | Argument | What it prints |
+|---|---|---|
+| `totals(array\|Closure\|bool $columns = true, string\|Closure\|null $label = null)` | Column names; `true` (or nothing) for the columns that have a `Sum` summarizer in the table; `false` for none | A last row with the sums, labelled *Total* (translated) or `$label`. The sum is formatted by the column itself, so a `money('JPY')` column prints `¥16,397,800` |
+| `groupBy(string\|Closure\|bool $column = true)` | A column's name, or a field of the record that is not a column (`customer.name`); `true` (or nothing) for the group chosen with Filament's *Group by* (`$table->groups([...])`); `false` for none | A heading row for each group (`Customer: Aoba`), and with totals a *Subtotal* row under each group |
+
+- Neither is on unless you call it: `PrintTableAction::make()` prints the list as before.
+- Sums are made from the column's raw value (`getState()`) of the printed rows; values that are not numbers count as 0. A column that is hidden or left out with `exceptColumns()` is not totalled.
+- The totals cover **the rows that are printed**. When the list is longer than `->limit()`, the last row says so (*Total of the 2,000 rows printed*) next to the note that the list was cut.
+- `groupBy('column')` keeps each group together in the order the groups first appear, with the rows of a group in the table's order. `groupBy()` without a name prints the groups as the screen shows them, and no headings when no group is chosen.
+- A heading is never left alone at the bottom of a page, and a subtotal never starts a page without the row above it. Heading texts come from your data and are printed as text.
+- The list still contains only what the table's own query returns for this user and tenant: totals and groups are worked out from those rows.
 
 ## PDF files on the server
 
@@ -593,6 +1099,30 @@ The **subject and message** come from the template's settings (*Email*), with fi
 
 Every email is logged with its recipients (format *Emailed*), and the PDF is kept as an [issued document](#issued-documents-electronic-bookkeeping) when the template keeps them. To change the mail — a reply-to address, a BCC to accounting — use `->modifyMailUsing(fn (PrintMail $mail, Invoice $record) => $mail->replyTo($record->owner->email)->bcc('accounting@example.com'))`. The mailer is the app's default, or `mail.mailer` in the config. From code: `WarpPrint::send('invoice', $invoice, ['a@example.com'])`.
 
+**After sending.** Every email fires `Qalainau\FilamentWarpPrint\Events\DocumentEmailed` — from `EmailPrintAction`, from `WarpPrint::send()` and once **per email** in a background batch (`EmailPrintBulkAction`, `WarpPrint::queue(..., 'email')`). Use it to note on the record that the document went out:
+
+```php
+use Illuminate\Support\Facades\Event;
+use Qalainau\FilamentWarpPrint\Events\DocumentEmailed;
+
+// in a service provider's boot()
+Event::listen(function (DocumentEmailed $event) {
+    if ($event->template->key === 'service-report' && $event->record instanceof WorkOrder) {
+        $event->record->forceFill(['report_sent_at' => now()])->saveQuietly();
+    }
+});
+```
+
+| Property | What it holds |
+| --- | --- |
+| `template` | The `PrintTemplate` that was sent |
+| `record` | The record (as read again through the source) |
+| `to`, `cc` | The addresses, trimmed (`list<string>`) |
+| `user` | Who sent it — in a background batch, the user who asked; `null` when nobody is logged in |
+| `attachment` | `'pdf'`, `'xlsx'` or `'docx'` |
+
+The event fires **after the mailer has accepted the email**: Warp Print sends the mail right away rather than putting it on the mail queue, so when the event fires the message has been handed to your mail server (SMTP, SES, …). It does not tell you that it reached the inbox. In a background batch the whole job runs on the queue, so the event fires inside the queue worker, as each email goes out. When sending throws (no recipient, a record the user may not print, the mail server refused it), the event does not fire.
+
 ## Large batches in the background
 
 When more records are selected than `batch_limit` (200), the print window does not draw them. It offers to make them **in the background**:
@@ -655,6 +1185,7 @@ use Qalainau\FilamentWarpPrint\Facades\WarpPrint;
 $pdf = WarpPrint::pdf('invoice', $invoice);                 // bytes of a PDF (needs a driver)
 $pdf = WarpPrint::pdf('invoice', $invoices);                // many records, one PDF
 $xlsx = WarpPrint::xlsx('invoice-excel', $invoice);         // an Excel template, filled (several records: a ZIP)
+$docx = WarpPrint::docx('payment-reminder', $invoice);      // a Word template, filled (several records: a ZIP)
 $html = WarpPrint::html('invoice', $invoice, ['autoprint' => true]); // a page that draws itself and opens the print dialog
 
 Mail::to($invoice->customer->email)->send(new InvoiceMail($invoice, $pdf));
@@ -663,7 +1194,21 @@ WarpPrint::send('invoice', $invoice, ['billing@acme.test'], cc: ['boss@acme.test
 $export = WarpPrint::queue('invoice', $invoices, 'pdf');    // in the background, the user is notified with the download
 $document = WarpPrint::issued('invoice', $invoice);         // the PDF last issued for the record (when kept)
 ['template' => $template, 'missing' => $missing] = WarpPrint::fromStarter('invoice-en', InvoiceSource::class);
+
+// Templates kept in your code: created and published the first time, a new version only when the layout changed
+['template' => $template, 'changed' => $changed] = WarpPrint::syncTemplate('invoice', InvoiceSource::class, $layout, name: 'Invoice', note: 'Standard invoice');
 ```
+
+`syncTemplate()` compares the layout with the published one and ignores the element IDs (which change every time a layout is saved), so it can run in a seeder or on every deploy. It throws when a template with that key exists for another source or type.
+
+**Which tenant.** In a panel with [tenants](#multi-tenancy), `syncTemplate()` keeps the template of the **current tenant**; pass `tenant: $team` for another one. To keep the **shared** template that every tenant uses (no tenant), pass `shared: true` — this works inside a tenant's panel too, for example when a new company signs up:
+
+```php
+WarpPrint::syncTemplate('invoice', InvoiceSource::class, $layout, shared: true);   // the template for all tenants
+WarpPrint::syncTemplate('invoice', InvoiceSource::class, $layout, tenant: $team);  // this team's own template
+```
+
+Passing both `tenant:` and `shared: true` throws an `InvalidArgumentException`. Outside a panel (a seeder, a deploy command) there is no current tenant, so the shared template is kept either way.
 
 The first argument is a template key or a `PrintTemplate`. Records can be models, a collection or keys; they are read again through the source (with its query and `canPrint()`), in the order given. Pass `log: false` to skip the print log and `user:` to print as someone else (for example in a queued job). Options for labels: `['skip' => 2, 'copies' => 3]`.
 
@@ -927,6 +1472,12 @@ php artisan vendor:publish --tag=filament-warp-print-config
 | `archive.enabled` | `false` | Keep issued PDFs (`WARP_PRINT_ARCHIVE`). See [Issued documents](#issued-documents-electronic-bookkeeping) |
 | `archive.disk`, `.directory` | `local`, `warp-print/documents` | Where issued PDFs are stored |
 | `archive.keep_years` | `null` | Years to keep issued PDFs (`null`: forever) |
+| `forms.node` | `node` | Node.js used to make filled PDF forms on the server (`WARP_PRINT_FORMS_NODE`); `null` turns it off |
+| `forms.fonts` | Noto Sans / Serif JP | TrueType files embedded in filled PDF forms; installed by `warp-print:fonts` |
+| `forms.disk`, `.directory` | `local`, `warp-print/entries` | Where the PDF of a submitted form is kept |
+| `forms.max_upload` | 20 MB | Largest form PDF that can be uploaded |
+| `forms.timeout` | 60 | Seconds to wait for node |
+| `forms.link.days`, `.per_minute` | 14, 30 | How long a form link works by default; saves per minute per link and IP |
 
 `WarpPrintPlugin` options:
 
@@ -934,6 +1485,8 @@ php artisan vendor:publish --tag=filament-warp-print-config
 WarpPrintPlugin::make()
     ->sources([InvoiceSource::class, CustomerSource::class])
     ->canManageTemplates(fn ($user) => $user->is_admin) // who may design templates (default: everyone in the panel)
+    ->canUseEntries(fn ($user) => $user->can('fill-forms')) // who sees Filled forms (default: everyone in the panel)
+    ->entries(false)                                     // no Filled forms page (no PDF and paper forms in this panel)
     ->templates(false)                                   // hide the templates page in this panel (print buttons still work)
     ->canViewArchive(fn ($user) => $user->is_accountant) // who may open Issued documents (default: everyone in the panel)
     ->archive(false)                                     // hide Issued documents in this panel (documents are still kept)
@@ -954,7 +1507,26 @@ WarpPrintPlugin::make()
 - **Background downloads** use a signed, expiring URL and are handed out only to the user who asked, while logged in. **Issued documents** cannot be changed or deleted from the app, and their hash is checked before they are downloaded again.
 - **Imported templates** go through the same checks as the designer's; only registered sources are accepted and an Excel file inside must be an `.xlsx` (ZIP) file of at most 10 MB.
 - **Excel files** are read without external entities and only the cells' XML is changed; macros (`.xlsm`) are not accepted.
+- **Word files** are read the same way: no external entities are loaded, values are written as text nodes (a value cannot add XML to the document), a value is never read again for `{{fields}}`, and macro files (`.docm`) are not accepted.
+- **Form links** are 48 random characters, stored only as a SHA-256 hash, expire after the days chosen and close when the form is submitted; the page is rate limited per link and IP, and marked `noindex`. The form PDF behind a link and the panel's form PDFs are served through signed, expiring URLs.
+- **Filled-in values are checked on the server** (types, lengths, formats, options, image size) whatever the browser sent. Fields marked *Cannot be changed* keep the record's value. Only fields your source marks `->writable()` are ever saved to a record, and links never save to a record without someone in the panel pressing *Save to record*. PDFs are always made again from the values; a PDF sent from a browser is never accepted.
 - **Who designs** is up to `canManageTemplates()`; who prints is up to where you put the buttons and their `->visible()` / `->authorize()`.
+- **Your policies apply to the designer and to filling in.** If the template's policy refuses `update`, the designer does not open (403), and saving, publishing or taking a new form PDF answer 403 even when called from the browser; the table hides *Design*. If a filled form's policy refuses `view`, it does not open; if it refuses `update`, the form opens read-only, *Save draft* and *Submit* are not shown, saving answers 403, and *Save to record*, *Reopen* and *Renew link* are hidden. Without policies nothing changes.
+
+
+### Restricting the designer and filling in per role
+
+```php
+use Qalainau\FilamentWarpPrint\Resources\PrintEntries\Pages\FillPrintEntry;
+
+WarpPrintPlugin::make()
+    ->canAccessUsing(fn (User $user, string $page): bool => $user->canOpenScreen($page))
+    ->canWriteUsing(fn (User $user, string $page): bool => ! $user->isReadOnlyOn($page))
+```
+
+`$page` is `DesignPrintTemplate` (the template designer) or `FillPrintEntry` (filling in a form). `canAccessUsing()` returning `false` gives a 403 at the page and refuses its Livewire calls. The designer is only for changing a template, so `canWriteUsing()` returning `false` closes it too; filling in opens read only (no *Save draft* or *Submit*, and *Write back*, *Reopen* and *New link* are hidden). These rules only narrow the plugin's options and your policies.
+
+The lists of templates, entries and issued documents also ask your policy's `viewAny` when you have one for the model, together with `canManageTemplates()`, `canUseEntries()` and `canViewArchive()`. Without a policy nothing changes (also with Filament's `strictAuthorization()`).
 
 ## Translations
 
@@ -971,10 +1543,12 @@ The text on the printed pages is whatever your admins write in the templates.
 - One table per template flows over pages; other tables show the rows that fit in their box.
 - Excel templates: `.xls` (Excel 97–2003) and macros are not supported; images from image fields are not placed in Excel; each item uses one row (a two-row item layout is not repeated as a block); cells that hold a field must contain the whole `{{…}}` in one piece of text (re-type it if Excel split it into differently formatted parts).
 - The browser's print dialog may add its own headers and footers (date, URL): turn them off in the dialog. Chrome, Edge and Firefox use the template's paper size; Safari may need the paper chosen in the dialog.
+- One photo element per template continues onto added pages, with up to 200 photos and 50 added pages per record.
 - One text block per template continues onto added pages; a single paragraph taller than the box is cut at the bottom (split long text into paragraphs).
 - Calculated fields are drawn on the page, so they are not in Excel forms or email subjects.
 - Watermarks are drawn on documents, not on label sheets.
 - Background jobs need a queue worker and database notifications; without notifications the file is made but nobody is told.
+- PDF and paper forms: handwriting on a scanned, filled-in form is not read (no OCR). Box finding works on clear scans with ruled lines; check its suggestions. XFA forms (some government PDFs made with Adobe LiveCycle) and password-protected PDFs cannot be used; PDF signature fields and buttons are not read in. Fonts are embedded per family, so a field shows the characters its font has (add a Korean font for Korean).
 
 ## Troubleshooting
 
@@ -985,6 +1559,10 @@ The text on the printed pages is whatever your admins write in the templates.
 **Japanese text prints in the wrong font, or as boxes, in server PDFs.** Install the fonts on the server (`fonts-noto-cjk`) or make sure it can reach Google Fonts.
 
 **"Warp Print cannot make PDF files on the server".** Set `WARP_PRINT_PDF_DRIVER` (see [PDF files on the server](#pdf-files-on-the-server)). Printing from the print window works without it.
+
+**Filled forms show "?" instead of Japanese, Chinese or Korean characters.** The PDF has no font for them yet: run `php artisan warp-print:fonts` (Korean needs a Korean font in `forms.fonts`).
+
+**"This server cannot make these PDFs itself".** PHP did not find Node.js 18+. Run `php artisan warp-print:check-forms`; if it says node was not found, set `WARP_PRINT_FORMS_NODE` to the full path (`which node`). Downloading and printing filled forms in the browser work without it.
 
 **"Make in the background" never finishes.** Start a queue worker (`php artisan queue:work`) and make sure the panel has `->databaseNotifications()`. A failed job sends a notification with the reason, and `failed_jobs` has the details.
 
