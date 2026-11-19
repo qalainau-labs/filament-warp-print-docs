@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.0.1] - 2026-11-20
+
+### Fixed
+
+- **Console error `warpPrint is not defined`**: on pages where Livewire re-renders a Print component inside another Alpine component, the browser console could show `warpPrint is not defined` before the component's script had arrived. An empty component is now registered up front, and the real one replaces it as soon as it loads. No visible change.
+
 ## [1.0.0] - 2026-11-20
 
 ### Added
