@@ -350,6 +350,8 @@ PrintAction::make()->source(InvoiceSource::class)
 
 The source is found from the record's model among the registered sources. The print window lists the **published** templates of that source (or the ones you name), shows the preview with the page count, and has **Print** (the browser's print dialog, which can also save a PDF), **Download PDF** (when a [PDF driver](#pdf-files-on-the-server) is set) and, for Excel templates, **Download Excel**.
 
+**Which template is selected first:** the templates are listed by their order (the `sort` column), and the window starts on the first one that can be made in the document's language — the record's [document language](#document-language) when one record is printed, the screen language for several. A template without a *Document language* follows the document's language, so it always counts; a template set to another language is skipped. So on an English screen an English customer's invoice opens with your English invoice even when the Japanese one is listed first. When none fits, the first template is selected. Templates you name with `->templates([...])` keep your order and the first one is selected.
+
 It is an ordinary Filament action: `->label()`, `->icon()`, `->visible()`, `->authorize()` and the rest work as usual.
 
 ### Several records

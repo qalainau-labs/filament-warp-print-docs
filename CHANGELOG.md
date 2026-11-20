@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [1.0.2] - 2026-11-20
+
+### Fixed
+
+- Filling in a PDF or paper form: an amount typed with thousands separators (`50,000`) or in full-width digits no longer stops *Submit* with "Please write a number" (the server already accepted it).
+- Submitting a form with a missing signature or other required fields now scrolls to the list of what is missing, so it can be read next to the red frames.
+- Designer: a table added from the left side fits inside the page margins instead of running off the right edge, and money columns start wider than quantity columns, so amounts stay on one line.
+
+### Changed
+
+- The print window first selects a template in the document's language (the record's `documentLocale()`, or the screen language for several records). Templates without a *Document language* match any language. Templates passed in a fixed order (`->templates([...])`) keep that order.
+- Filling in *As a list*: the field name comes first, and under it a small picture of where the field is on the form, marked in yellow with a short caption, instead of a red frame above the name.
+
 ## [1.0.1] - 2026-11-20
 
 ### Fixed
